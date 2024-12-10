@@ -1,0 +1,9 @@
+CHANGES for gsl
+
+v1.4 (12/21/99)
+------------
+1. Uses 'configure' script for installation.
+
+v1.3
+---------
+* Removed the negative sign from Lat of Kwaj in RMI_loc.dat and KWA_loc.dat.

@@ -1,0 +1,119 @@
+<HTML>
+<HEAD>
+
+<TITLE> GSL Include file</TITLE>
+
+
+</HEAD>
+<BODY BGCOLOR="FFFFFF" TEXT="000000">
+<center>
+    <img src="gifs/gsl_banner.gif">
+    <hr>
+<H1>GSL Include file</H1>
+</center>
+
+<pre>
+
+/*
+ * The Gauge Software Library.  Version 0.2
+ */
+
+/* Need to include:
+   1. Example strings for 'names', 'types', etc.
+   2. Units for values.
+   */
+
+typedef struct {
+  int   	year;		/* Year (4-digits: 19xx, or 20xx)*/
+  int   	jday; 		/* Julian day from begining of the year (int 0-365) */
+  int		month;      /* Month (int 0-11) */
+  int		day;        /* Day of month (int 0-30) */
+  int   	hour;		/* Hour of the day (int 0-23) */
+  int   	minute;     /* Minute of the day (int 0-59) */
+  float 	sec; 		/* Second (float) */
+} Time;
+
+typedef struct {
+  Time  	time;
+  float 	rate;		/* Rain Rate [mm hr-1] (float) */
+} Gauge_record;
+
+typedef struct {
+  char  	*name; 		/* Name of the gauge (from header) */
+  int  		number; 	/* Number of this gauge (from header) */
+  char  	*type; 		/* "TIP", "HAN", "REC", "ORG", "DSD" (from header) */
+  char      *site;      /* Site name: "FLA", "THA", ... (Also in Network header */
+  float		resolution;	/* Resolution in minutes  (from (header) */
+  float 	lat;  		/* Latitude in degrees (from (header) */
+  float 	lon;  		/* Longitude in degrees (from (header) */
+  float  	azimuth; 	/* Relative to primary radar */
+  float  	range;   	/* Relative to primary radar */
+  float     elevation;  /* Elevation of gauge above msl (m) */
+  int    	nrec;    	/* Number of observations (values) in 'record' array */
+} Gauge_header;
+
+typedef struct {
+  Gauge_header 	h;
+  Gauge_record 	*record;
+} Gauge;
+
+typedef struct {
+  char 		*name;       	/* Name of this network (from individual header */
+  char 		*location;   	/* Network location (e.g., state, from ind. header) */
+  int 		ngauges;      	/* Number of gauges in gauge array. */
+} Gauge_network_header;
+
+typedef struct {
+  Gauge_network_header h;
+  Gauge **gauge; 			/* gauge[0..ngauges-1]. */
+} Gauge_network;
+
+typedef struct {
+  char 			*name;	/* Name of this site (e.g., Florida) */
+  int 			nnet;	/* Number of networks in this site */
+  Gauge_network **net; 	/* net[0..nnet-1]. */
+} Gauge_site;
+
+
+void print_network(Gauge_network *gnet);
+Gauge_network *Gconstruct_gauge_network(int nfiles, char **infile);
+Gauge_site *Gconstruct_gauge_site(char *infile);
+
+/* Memory allocation */
+
+Gauge         *Gnew_gauge(int nrate);
+Gauge_network *Gnew_gauge_network(int ngauges);
+Gauge_site    *Gnew_gauge_site(int nnet);
+
+/* Memory deallocation. */
+
+void Gfree_gauge(Gauge *gauge);
+void Gfree_gauge_network(Gauge_network *network);
+void Gfree_gauge_site(Gauge_site *site);
+
+/* Clear memory. */
+
+Gauge         *Gclear_gauge(Gauge *gauge);
+Gauge_network *Gclear_gauge_network(Gauge_network *network);
+Gauge_site    *Gclear_gauge_site(Gauge_site *site);
+
+Gauge *Gread_gmin(char *infile);
+
+</pre>
+
+<center>
+<hr>
+</center>
+<img src="http://trmm.gsfc.nasa.gov/trmm_office/gifs/rainbow_nasa.gif"> <br></B>
+This web site is maintained by David B. Wolff under the direction 
+of Mr. Otto Thiele 
+<pre>
+        <a href="mailto:thiele@trmm.gsfc.nasa.gov">Otto W. Thiele</a>                     <a href="mailto:wolff@trmm.gsfc.nasa.gov">David B. Wolff</a>
+        Head, TRMM Office                  NASA/TRMM Office
+        NASA/GSFC/910.1                    NASA/GSFC/910.1
+        Greenbelt, MD 20771                Greenbelt, MD 20771 USA
+        thiele@trmm.gsfc.nasa.gov          wolff@trmm.gsfc.nasa.gov
+</pre>
+</body>
+</html>
+

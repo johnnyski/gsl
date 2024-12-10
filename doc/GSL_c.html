@@ -1,0 +1,300 @@
+<HTML>
+<HEAD>
+
+<TITLE> GSL Include file</TITLE>
+
+
+</HEAD>
+<BODY BGCOLOR="FFFFFF" TEXT="000000">
+<center>
+    <img src="gifs/gsl_banner.gif">
+    <hr>
+<H1>GSL Code file</H1>
+</center>
+
+<pre>
+#include <stdio.h>
+#include <string.h>
+#include "gsl.h"
+
+static int julian(int mo, int day, int year);
+static void ymd(int jday, int yy, int *mm, int *dd);
+
+/***********************************************************************/
+/*                                                                     */
+/*                                                                     */
+/*                            julian                                   */
+/*                                                                     */
+/*                                                                     */
+/***********************************************************************/
+static int daytab[2][13] = {
+  {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365},
+  {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366}
+};
+
+static int julian(int mo, int day, int year)
+{
+  int leap;
+
+  leap = (year%4 == 0 && year%100 != 0) || year%400 == 0;
+  return day + daytab[leap][mo-1];
+}
+
+static void ymd(int jday, int yy, int *mm, int *dd)
+{
+  /*  Input: jday, yy */
+  /* Output: mm, dd */
+  int leap;
+  int i;
+
+  leap = (yy%4 == 0 && yy%100 != 0) || yy%400 == 0;
+  for (i=0; daytab[leap][i]<jday; i++) continue;
+  *mm = i;
+  i--;
+  *dd = jday - daytab[leap][i];
+}
+
+void print_network(Gauge_network *gnet)
+{
+  int i;
+  Gauge *g;
+
+  if (gnet == NULL) return;
+  for (i = 0; i<gnet->h.ngauges; i++) {
+    g = gnet->gauge[i];
+    printf("------------< Gauge # %d of %d>------------\n", i+1,gnet->h.ngauges);
+    printf("  Name: %s\n", g->h.name);
+    printf("  Number: %d\n", g->h.number);
+    printf("  Type: %s, Lat %f, Lon %f\n", g->h.type, g->h.lat, g->h.lon);
+  }
+
+  return;
+}
+
+/*************************************************************/
+/*                                                           */
+/*                 Gnew_gauge                                */
+/*                                                           */
+/*************************************************************/
+Gauge *Gnew_gauge(int nval)
+{
+  Gauge *g;
+
+  g = (Gauge *) calloc (1, sizeof(Gauge));
+  if (g==NULL) perror("Gnew_gauge -- Allocating g");
+  g->h.nrec = nval;
+  g->record    = (Gauge_record *)calloc(nval, sizeof(Gauge_record));
+  if (g->record==NULL) perror("Gnew_gauge -- Allocating g->record");
+  return g;
+}
+
+/*************************************************************/
+/*                                                           */
+/*                 Gfree_gauge                               */
+/*                                                           */
+/*************************************************************/
+void Gfree_gauge(Gauge *g)
+{
+  if (g == NULL) return;
+  if (g->record) free(g->record);
+  free(g);
+}
+
+/*************************************************************/
+/*                                                           */
+/*                 Gnew_gauge_network                        */
+/*                                                           */
+/*************************************************************/
+Gauge_network *Gnew_gauge_network(int ngauges)
+{
+  Gauge_network *gnet;
+  gnet = (Gauge_network *) calloc(1, sizeof(Gauge_network));
+  if (gnet == NULL) {
+    perror("Gnew_gauge_network -- gnet");
+    return NULL;
+  }
+  gnet->h.ngauges = ngauges; /* Default setting. */
+  gnet->gauge = (Gauge **)calloc(ngauges, sizeof(Gauge *));
+  if (gnet->gauge == NULL) {
+    perror("Gnew_gauge_network -- gnet->gauge");
+    return NULL;
+  }
+  return gnet;
+}
+
+
+/*************************************************************/
+/*                                                           */
+/*                       Gprint_gauge                        */
+/*                                                           */
+/*************************************************************/
+void Gprint_gauge(Gauge *g)
+{
+  int i;
+
+  if (g == NULL) {
+    printf("Gprint_gauge: g == NULL\n");
+    return;
+  }
+
+  printf("%4.4d %s %s %s %f %f %f %f %f\n",
+         g->h.number, g->h.site, g->h.name, g->h.type,
+         g->h.resolution,
+         g->h.lat, g->h.lon,
+         g->h.range, g->h.azimuth);
+
+  for (i=0; i<g->h.nrec; i++) {
+    printf("%2.2d %2d (%2.2d/%2.2d/%2.2d) %2.2d %2.2d %f %f\n",
+           g->record[i].time.year, g->record[i].time.jday,
+           g->record[i].time.month, g->record[i].time.day,
+           g->record[i].time.year,
+           g->record[i].time.hour, g->record[i].time.minute,
+           g->record[i].time.sec,
+           g->record[i].rate);
+  }
+}
+
+/*************************************************************/
+/*                                                           */
+/*                     copy_to_larger_obs                    */
+/*                                                           */
+/*************************************************************/
+Gauge *copy_to_larger_obs(Gauge *g_old, int n)
+{
+  Gauge *g;
+  if (g_old == NULL) return NULL;
+  g = Gnew_gauge(n);
+  g->h = g_old->h;  /* Overwrites h.nobs.  See next line. */
+  g->h.nrec = n;    /* We'll check if this is enough, during read. */
+
+  /* Copy */
+  memcpy(g->record, g_old->record, sizeof(Gauge_record)*g_old->h.nrec);
+  free(g_old->record);
+  free(g_old);
+  return g;
+}
+  
+
+/*************************************************************/
+/*                                                           */
+/*                       Gread_gmin                          */
+/*                                                           */
+/*************************************************************/
+Gauge *Gread_gmin(char *infile)
+{
+  FILE *fp;
+  Gauge *g;
+  char name[20];
+  char type[20];
+  char site[20];
+  char network[20];
+ /* The default amount asked for is 15000 observations.  If this is
+  * not enough, then 15000 more are allocated -- the original is
+  * saved and new measurements are appended.  See copy_to_larger_obs.
+  */
+  int maxobs = 15000;
+  int n, yy, jday, hh, mm, ss;
+  float ob;
+
+  fp = fopen(infile, "r");
+  if(fp==NULL) {
+    perror(infile);
+    return NULL;
+  }
+
+  g = Gnew_gauge(maxobs);
+
+  /* One header record. */
+  fscanf(fp, "%d %*s %s %s %s %f %f %f %f %f %f\n",
+         &g->h.number, name, site, network, type, &g->h.resolution,
+         &g->h.lat, &g->h.lon,
+         &g->h.elevation,
+         &g->h.range, &g->h.azimuth);
+  
+  /* 'site' is a network parameter, also. */
+
+  g->h.name = strdup(name);
+  g->h.type = strdup(type);
+  g->h.site = strdup(site);
+
+  n = 0;
+  while(fscanf(fp, "%d %d %d %d %d %f\n",
+               &yy, &jday, &hh, &mm, &ss, &ob) != EOF) {
+    g->record[n].time.year   = yy;
+    g->record[n].time.jday   = jday;
+    ymd(jday, yy, &g->record[n].time.month, &g->record[n].time.day);
+    g->record[n].time.hour   = hh;
+    g->record[n].time.minute = mm;
+    g->record[n].time.sec    = ss;
+    g->record[n].rate        = ob;
+    n++;
+    if (n >= g->h.nrec)
+      g = copy_to_larger_obs(g, g->h.nrec + maxobs);
+
+  }
+  fclose(fp);
+  g->h.nrec = n;
+  return g;
+}
+
+
+/*************************************************************/
+/*                                                           */
+/*                 Gconstruct_gauge_network                  */
+/*                                                           */
+/*************************************************************/
+
+/* NOTE:
+ *  The construction of the gauge network does not depend on 
+ *  checking that the data is within one network.  It may be
+ *  necessary to dynamically construct an array of networks, at
+ *  this time, to ensure that data is properly associated.
+ */
+
+Gauge_network *Gconstruct_gauge_network(int nfiles, char **infile)
+{
+  /* [1..nfiles] filenames are present in 'infile'.  For each
+   * file, add the gauge to the network.
+   */
+  Gauge_network *gauge_net;
+  int i;
+
+  gauge_net = Gnew_gauge_network(nfiles);
+  if (gauge_net == NULL) return NULL;
+
+  gauge_net->h.name = strdup(infile[0]); /* Get this from an argument??? */
+  for (i=0; i<nfiles; i++) {
+    printf("gauge_net->gauge[%d] = Gread_gmin(%s);\n", i, infile[i]);
+    gauge_net->gauge[i] = Gread_gmin(infile[i]);
+    /* Copy the site name for this network.
+     * WARNING:  Normal usages want this
+     * site to be the same site name, however, it is not required,
+     * nor is it checked for a match at this time.
+     */
+    gauge_net->h.name = strdup(gauge_net->gauge[i]->h.site);
+  }
+
+  return gauge_net;
+}
+
+</pre>
+
+
+
+
+<center>
+<hr>
+</center>
+<img src="http://trmm.gsfc.nasa.gov/trmm_office/gifs/rainbow_nasa.gif"> <br></B>
+This web site is maintained by David B. Wolff under the direction 
+of Mr. Otto Thiele 
+<pre>
+        <a href="mailto:thiele@trmm.gsfc.nasa.gov">Otto W. Thiele</a>                     <a href="mailto:wolff@trmm.gsfc.nasa.gov">David B. Wolff</a>
+        Head, TRMM Office                  NASA/TRMM Office
+        NASA/GSFC/910.1                    NASA/GSFC/910.1
+        Greenbelt, MD 20771                Greenbelt, MD 20771 USA
+        thiele@trmm.gsfc.nasa.gov          wolff@trmm.gsfc.nasa.gov
+</pre>
+</body>
+</html>
+
